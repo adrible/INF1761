@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 import wgpu
+import graphics_math as gm
 from rendercanvas.glfw import RenderCanvas, loop
 
 from camera3d import Camera3D
@@ -119,6 +120,21 @@ def initialize(device, target_format):
     shader.add_material(vermelho)
 
     # ---------------------------------------------------------
+    # Fog linear
+    #
+    # Objetos até fog_near aparecem praticamente normais.
+    # A partir daí, misturam gradualmente com fog_color até
+    # alcançar fog_far.
+    # ---------------------------------------------------------
+    fog_color = gm.vec3(0.12, 0.12, 0.14)
+    fog_near = 4.0
+    fog_far = 10.0
+
+    shader.set_value("fog_color", fog_color)
+    shader.set_value("fog_near", fog_near)
+    shader.set_value("fog_far", fog_far)
+
+    # ---------------------------------------------------------
     # Pipeline texturizado: mesma SpotLight + decal
     # ---------------------------------------------------------
     textured_shader = Shader(
@@ -169,6 +185,11 @@ def initialize(device, target_format):
 
     textured_shader.add_material(bloco_material)
     textured_shader.add_material(esfera_material)
+
+    # O mesmo fog é aplicado aos objetos com decal.
+    textured_shader.set_value("fog_color", fog_color)
+    textured_shader.set_value("fog_near", fog_near)
+    textured_shader.set_value("fog_far", fog_far)
 
     # ---------------------------------------------------------
     # Decals / texturas de padronagem de cor
@@ -280,7 +301,7 @@ def main():
 
     canvas = RenderCanvas(
         size=(640, 480),
-        title="Projeto 2 - Mesa com SpotLight e Decals",
+        title="Projeto 2 - SpotLight, Decals e Fog",
         update_mode="continuous",
         max_fps=60,
     )
