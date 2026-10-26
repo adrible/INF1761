@@ -14,6 +14,11 @@ struct Global {
   spot_angle: f32,
   spot_exponent: f32,
   camera_position: vec4<f32>,
+
+  // Fog linear
+  fog_color: vec3<f32>,
+  fog_near: f32,
+  fog_far: f32,
 }
 @group(0) @binding(0) var<uniform> global: Global;
 
@@ -34,6 +39,7 @@ struct VertexOutput {
   @location(1) light: vec3<f32>,
   @location(2) view: vec3<f32>,
   @location(3) texcoord: vec2<f32>,
+  @location(4) fog_distance: f32,
 }
 
 @vertex
@@ -52,12 +58,10 @@ fn vs_main(
   out.light = normalize(global.light_position.xyz - p);
   out.view = normalize(-p);
   out.texcoord = texcoord;
+  out.fog_distance = length(p);
   out.clip_position = global.projection * vec4<f32>(p, 1.0);
 
-  // "tangent" faz parte do formato de vértice do grafo de cena.
-  // Não é necessário para um decal de cor simples.
   let _unused_tangent = tangent;
-
   return out;
 }
 
@@ -67,7 +71,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
   let light = normalize(in.light);
   let view = normalize(in.view);
 
-  // Vetor -light aponta da fonte para o fragmento.
+  // SpotLight
   let c = dot(-light, normalize(global.spot_direction));
   let cutoff = cos(global.spot_angle);
 
@@ -87,6 +91,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     color += material.specular_color * global.light_specular * spec * kspot;
   }
 
+  // Aplica a padronagem de cor antes do fog.
   let decal = textureSample(decal_texture, decal_sampler, in.texcoord);
-  return vec4<f32>(color, material.opacity) * decal;
+  let textured_color = color * decal.rgb;
+
+  // Fog linear
+  let fog_factor = clamp(
+    (global.fog_far - in.fog_distance) /
+    (global.fog_far - global.fog_near),
+    0.0,
+    1.0
+  );
+
+  let final_color = mix(global.fog_color, textured_color, fog_factor);
+  return vec4<f32>(final_color, material.opacity * decal.a);
 }
